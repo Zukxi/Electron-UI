@@ -105,7 +105,7 @@ To build and run this project locally:
 
 ## 👥 Credits
 
-* **Creator & Lead Developer:** [Your Name / Username]
+* **Creator & Lead Developer:** [Zuki]
 * **Co-Pilot / Help:** [Gemini (AI) / Stack Overflow / Github]
 * **API Provider:** [ScriptBlox](https://scriptblox.com)
 
