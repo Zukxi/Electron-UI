@@ -6,7 +6,9 @@ const api = {
   maximize: () => ipcRenderer.send('maximize-window'),
   close: () => ipcRenderer.send('close-window'),
   openFile: () => ipcRenderer.invoke('dialog:openFile'),
-  fetchScripts: (mode, query, page) => ipcRenderer.invoke('api:fetchScripts', { mode, query, page })
+  fetchScripts: (mode, query, page) => ipcRenderer.invoke('api:fetchScripts', { mode, query, page }),
+  // --- NEW FUNCTION ---
+  setTopMost: (isTop) => ipcRenderer.send('set-top-most', isTop)
 }
 
 if (process.contextIsolated) {

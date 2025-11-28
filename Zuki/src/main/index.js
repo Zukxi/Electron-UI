@@ -12,20 +12,19 @@ function createWindow() {
     minWidth: 600,
     minHeight: 400,
     show: false,
-    frame: false, // Frameless window for custom UI
+    frame: false, 
     autoHideMenuBar: true,
-    transparent: false, // Disabled transparency to ensure native resizing works on Windows
-    backgroundColor: '#09090b', // Solid dark background
-    resizable: true, 
+    transparent: false, // Keep false for resizing stability
+    backgroundColor: '#09090b',
+    resizable: true,
     ...(process.platform === 'linux' ? { icon } : {}),
     webPreferences: {
       preload: join(__dirname, '../preload/index.js'),
       sandbox: false,
-      webSecurity: false // Allows loading external images from ScriptBlox
+      webSecurity: false
     }
   })
 
-  // Configure CSP to allow scripts and images from external sources
   mainWindow.webContents.session.webRequest.onHeadersReceived((details, callback) => {
     callback({
       responseHeaders: {
@@ -35,9 +34,7 @@ function createWindow() {
     })
   })
 
-  mainWindow.on('ready-to-show', () => {
-    mainWindow.show()
-  })
+  mainWindow.on('ready-to-show', () => mainWindow.show())
 
   mainWindow.webContents.setWindowOpenHandler((details) => {
     shell.openExternal(details.url)
@@ -50,92 +47,57 @@ function createWindow() {
     mainWindow.loadFile(join(__dirname, '../renderer/index.html'))
   }
 
-  // --- WINDOW CONTROL HANDLERS ---
+  // --- WINDOW CONTROLS ---
   ipcMain.on('minimize-window', () => mainWindow.minimize())
   ipcMain.on('maximize-window', () => {
     if (mainWindow.isMaximized()) mainWindow.unmaximize()
     else mainWindow.maximize()
   })
   ipcMain.on('close-window', () => mainWindow.close())
+
+  // --- NEW: ALWAYS ON TOP HANDLER ---
+  ipcMain.on('set-top-most', (_, isTop) => {
+    mainWindow.setAlwaysOnTop(isTop)
+  })
 }
 
-// --- LOCAL FILE SYSTEM HANDLER ---
+// --- FILE & API HANDLERS ---
 ipcMain.handle('dialog:openFile', async () => {
   const { canceled, filePaths } = await dialog.showOpenDialog({
     properties: ['openFile'],
-    filters: [
-      { name: 'Scripts', extensions: ['lua', 'txt', 'json', 'md'] },
-      { name: 'All Files', extensions: ['*'] }
-    ]
+    filters: [{ name: 'Scripts', extensions: ['lua', 'txt', 'json', 'md'] }, { name: 'All Files', extensions: ['*'] }]
   })
-  
-  if (canceled) {
-    return null
-  } else {
-    const filePath = filePaths[0]
-    const content = fs.readFileSync(filePath, 'utf-8')
-    const fileName = path.basename(filePath)
-    return { name: fileName, content, path: filePath }
-  }
+  if (canceled) return null
+  const content = fs.readFileSync(filePaths[0], 'utf-8')
+  return { name: path.basename(filePaths[0]), content, path: filePaths[0] }
 })
 
-// --- SCRIPTBLOX API HANDLER ---
-// Fetches scripts from the cloud while pretending to be a browser (User-Agent)
 ipcMain.handle('api:fetchScripts', async (_, { mode, query, page }) => {
   try {
     let url = `https://scriptblox.com/api/script/${mode}?page=${page}`
+    if (mode === 'search') url = `https://scriptblox.com/api/script/search?q=${encodeURIComponent(query)}&page=${page}`
     
-    if (mode === 'search') {
-      url = `https://scriptblox.com/api/script/search?q=${encodeURIComponent(query)}&page=${page}`
-    }
-    
-    console.log(`Fetching: ${url}`)
-
     const response = await fetch(url, {
-        headers: {
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
-        }
+        headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36' }
     })
-
-    if (!response.ok) {
-        console.error(`API Error: ${response.statusText}`)
-        return { scripts: [], totalPages: 1 }
-    }
-
+    
+    if (!response.ok) return { scripts: [], totalPages: 1 }
     const data = await response.json()
     
-    // Return scripts and page count
     if (data.result && data.result.scripts) {
-        return { 
-            scripts: data.result.scripts, 
-            totalPages: data.result.totalPages || 1
-        }
+        return { scripts: data.result.scripts, totalPages: data.result.totalPages || 1 }
     }
-    
     return { scripts: [], totalPages: 1 }
-
   } catch (error) {
-    console.error("ScriptBlox Fetch Error:", error)
     return { scripts: [], totalPages: 1 }
   }
 })
 
 app.whenReady().then(() => {
   electronApp.setAppUserModelId('com.electron')
-
-  app.on('browser-window-created', (_, window) => {
-    optimizer.watchWindowShortcuts(window)
-  })
-
+  app.on('browser-window-created', (_, window) => { optimizer.watchWindowShortcuts(window) })
   createWindow()
-
-  app.on('activate', function () {
-    if (BrowserWindow.getAllWindows().length === 0) createWindow()
-  })
+  app.on('activate', function () { if (BrowserWindow.getAllWindows().length === 0) createWindow() })
 })
 
-app.on('window-all-closed', () => {
-  if (process.platform !== 'darwin') {
-    app.quit()
-  }
-})
+app.on('window-all-closed', () => { if (process.platform !== 'darwin') app.quit() })

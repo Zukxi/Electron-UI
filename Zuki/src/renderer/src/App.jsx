@@ -1,43 +1,43 @@
 import React, { useState, useEffect, useRef } from 'react'
 import AceEditor from 'react-ace'
 
-// --- ACE CONFIGURATION ---
+// --- ACE IMPORTS ---
 import 'ace-builds/src-noconflict/mode-lua'
 import 'ace-builds/src-noconflict/mode-json'
 import 'ace-builds/src-noconflict/mode-markdown'
+// Themes
 import 'ace-builds/src-noconflict/theme-dracula'
 import 'ace-builds/src-noconflict/theme-monokai'
 import 'ace-builds/src-noconflict/theme-twilight'
 import 'ace-builds/src-noconflict/theme-solarized_dark'
 import 'ace-builds/src-noconflict/theme-tomorrow_night'
 import 'ace-builds/src-noconflict/theme-github'
+import 'ace-builds/src-noconflict/theme-nord_dark'
+
 import 'ace-builds/src-noconflict/ext-language_tools' 
 
 // --- ICONS ---
 import { 
   Files, Search, GitGraph, Settings, Minus, Square, X, 
-  ChevronRight, Plus, Play, Save, FolderOpen, Trash2, Link, Unlink, Cloud, Eye, Copy, Download, ShieldCheck, ChevronLeft, Clock, Lock, Check, Folder
+  ChevronRight, Plus, Play, Save, FolderOpen, Trash2, Link, Unlink, Cloud, Eye, Copy, Download, ShieldCheck, ChevronLeft, Clock, Lock, Check, Folder, Palette, Monitor, Layers
 } from 'lucide-react'
 
-// --- THEME DEFINITIONS ---
-const THEMES = {
+// --- THEMES (Expanded) ---
+const PRESET_THEMES = {
     dracula: { name: 'Dracula', bg: '#282a36', sidebar: '#21222c', accent: '#ff79c6', button: '#bd93f9', text: '#f8f8f2' },
     monokai: { name: 'Monokai', bg: '#272822', sidebar: '#1e1f1c', accent: '#a6e22e', button: '#f92672', text: '#f8f8f2' },
-    // Simulated Acrylic (Solid colors to allow resizing)
-    acrylic: { name: 'Acrylic', bg: '#09090b', sidebar: '#121214', accent: '#22d3ee', button: '#22d3ee', text: '#ffffff' },
+    twilight: { name: 'Twilight', bg: '#141414', sidebar: '#1e1e1e', accent: '#f9ee98', button: '#7587a6', text: '#f8f8f2' },
+    nord: { name: 'Nord', bg: '#2e3440', sidebar: '#3b4252', accent: '#88c0d0', button: '#81a1c1', text: '#d8dee9' },
+    abyss: { name: 'Abyss', bg: '#000c18', sidebar: '#001f3f', accent: '#0074D9', button: '#7FDBFF', text: '#ffffff' },
+    synthwave: { name: 'Synthwave', bg: '#2b213a', sidebar: '#241b2f', accent: '#ff7edb', button: '#36f9f6', text: '#fbfbfb' },
+    // Acrylic disabled style (Solid colors to allow resizing)
+    acrylic: { name: 'Acrylic (Legacy)', bg: '#09090b', sidebar: '#121214', accent: '#22d3ee', button: '#22d3ee', text: '#ffffff' },
 }
 
-// Fallback image for scripts
 const PLACEHOLDER_IMG = "https://images.rbxcdn.com/28ab48fcd5d5b19b03c126d2b6aef4b8.jpg";
 
-// --- FORMATTING HELPERS ---
-const formatViews = (num) => {
-    if (!num) return '0';
-    if (num >= 1000000) return (num / 1000000).toFixed(1).replace(/\.0$/, '') + 'M';
-    if (num >= 1000) return (num / 1000).toFixed(1).replace(/\.0$/, '') + 'k';
-    return num.toString();
-}
-
+// --- HELPERS ---
+const formatViews = (num) => num >= 1000000 ? (num/1000000).toFixed(1) + 'M' : num >= 1000 ? (num/1000).toFixed(1) + 'k' : num;
 const timeAgo = (dateString) => {
     const s = Math.floor((new Date() - new Date(dateString)) / 1000);
     if(isNaN(s)) return 'Unknown';
@@ -49,18 +49,32 @@ const timeAgo = (dateString) => {
 }
 
 export default function App() {
-  // --- APP STATE ---
   const [activeActivity, setActiveActivity] = useState('files')
   const [expandedFolders, setExpandedFolders] = useState({ 'src': true, 'scripts': true })
+  
   const [isTerminalOpen, setIsTerminalOpen] = useState(true)
   const [isSettingsOpen, setIsSettingsOpen] = useState(false)
   const [isAttached, setIsAttached] = useState(false)
-  const [logs, setLogs] = useState([{ type: 'info', text: 'Luminos Executor v3.0 initialized...' }])
+  const [logs, setLogs] = useState([{ type: 'info', text: 'Luminos Executor v3.1 initialized...' }])
 
-  const [settings, setSettings] = useState({ theme: 'acrylic', fontSize: 14, showLineNumbers: true, autoSave: false })
-  const colors = THEMES[settings.theme] || THEMES.dracula
+  // --- SETTINGS & THEME STATE ---
+  const [settings, setSettings] = useState({ 
+      theme: 'dracula', 
+      fontSize: 14, 
+      showLineNumbers: true, 
+      autoSave: false, 
+      topMost: false, // New Setting
+      acrylicBlur: false // Disabled
+  })
 
-  // --- EDITOR FILE SYSTEM ---
+  // Custom Theme State (User created)
+  const [customTheme, setCustomTheme] = useState({ 
+      name: 'Custom', bg: '#111111', sidebar: '#1a1a1a', accent: '#e63946', button: '#e63946', text: '#ffffff' 
+  })
+
+  // Calculate current colors dynamically
+  const colors = settings.theme === 'custom' ? customTheme : (PRESET_THEMES[settings.theme] || PRESET_THEMES.dracula)
+
   const [files, setFiles] = useState([
     { id: '1', name: 'aimbot.lua', folder: 'scripts', content: 'print("Aimbot Loaded")', isTemp: false },
     { id: '2', name: 'esp.lua', folder: 'scripts', content: 'print("ESP On")', isTemp: false },
@@ -69,21 +83,27 @@ export default function App() {
   const [activeTabId, setActiveTabId] = useState('1')
   const [renamingId, setRenamingId] = useState(null)
 
-  // --- SCRIPT HUB STATE ---
   const [hubScripts, setHubScripts] = useState([])
   const [selectedScript, setSelectedScript] = useState(null)
   const [hubQuery, setHubQuery] = useState('')
   const [hubPage, setHubPage] = useState(1)
   const [totalPages, setTotalPages] = useState(1)
   const [isLoading, setIsLoading] = useState(false)
-
   const [saveModal, setSaveModal] = useState({ open: false, fileId: null })
 
-  // --- ACTIONS ---
   const addLog = (text, type = 'info') => setLogs(prev => [...prev, { type, text, time: new Date().toLocaleTimeString() }])
-  const updateSetting = (key, value) => setSettings(prev => ({ ...prev, [key]: value }))
+  
+  const updateSetting = (key, value) => {
+      setSettings(prev => {
+          const newSettings = { ...prev, [key]: value }
+          // Handle side effects (IPC call for TopMost)
+          if (key === 'topMost' && window.api && window.api.setTopMost) {
+              window.api.setTopMost(value)
+          }
+          return newSettings
+      })
+  }
 
-  // --- API FETCH ---
   const fetchScripts = async (resetPage = false) => {
       setIsLoading(true); const page = resetPage ? 1 : hubPage; if(resetPage) setHubPage(1);
       try {
@@ -96,7 +116,6 @@ export default function App() {
   useEffect(() => { if (activeActivity === 'scripts') fetchScripts() }, [activeActivity, hubPage]) 
   const handleSearchKeyDown = (e) => { if (e.key === 'Enter') fetchScripts(true) }
 
-  // --- BUTTON HANDLERS ---
   const handleAttach = () => { setIsAttached(!isAttached); addLog(isAttached ? "Detached." : "Attached.", isAttached ? "error" : "success") }
   const handleExecute = () => { isAttached ? addLog(`Executed script`, "success") : addLog("Attach first!", "error") }
   const handleExecuteScript = (code, title) => { isAttached ? addLog(`Executed: ${title}`, "success") : addLog("Attach first!", "error") }
@@ -112,22 +131,20 @@ export default function App() {
           }
       }
   }
-  
   const confirmSave = (newName, targetFolder) => {
       if (!newName.trim()) return;
       setFiles(prev => prev.map(f => f.id === saveModal.fileId ? { ...f, name: newName, folder: targetFolder, isTemp: false } : f))
       setSaveModal({ open: false, fileId: null })
+      if(!expandedFolders[targetFolder]) setExpandedFolders(prev => ({...prev, [targetFolder]: true}))
       addLog(`Saved '${newName}' to ${targetFolder}`, "success")
   }
 
   const handleOpen = async () => { try { const data = await window.api.openFile(); if(data) { handleNewFile(data.name, data.content, false); addLog(`Opened ${data.name}`, "info") } } catch(e) {} }
-  
   const handleNewFile = (name, content = '', isTemp = true) => {
     const newId = Date.now().toString(); const newName = name || `Untitled.lua`
     setFiles([...files, { id: newId, name: newName, folder: 'root', content, isTemp }])
     setOpenTabIds([...openTabIds, newId]); setActiveTabId(newId)
   }
-
   const handleRename = (id, newName) => { if (newName.trim()) setFiles(files.map(f => f.id === id ? { ...f, name: newName } : f)); setRenamingId(null) }
   const handleCloseTab = (e, id) => { e.stopPropagation(); const newTabs = openTabIds.filter(t => t !== id); setOpenTabIds(newTabs); if(activeTabId === id) setActiveTabId(newTabs[newTabs.length - 1] || null) }
   const handleEditorChange = (val) => setFiles(files.map(f => f.id === activeTabId ? { ...f, content: val } : f))
@@ -135,15 +152,15 @@ export default function App() {
   const activeFile = files.find(f => f.id === activeTabId)
   const getMode = (f) => f && f.endsWith('.json') ? 'json' : f && f.endsWith('.md') ? 'markdown' : 'lua'
 
+  const uniqueFolders = [...new Set(files.map(f => f.folder).filter(f => f !== 'root'))].sort()
+  if (!uniqueFolders.includes('scripts')) uniqueFolders.unshift('scripts')
+
   return (
     <div className="flex flex-col h-full absolute inset-0 font-sans overflow-hidden transition-colors duration-300 border border-white/10" style={{ backgroundColor: colors.bg, color: colors.text }}>
       
-      {/* TITLE BAR */}
-      <TitleBar isAttached={isAttached} onAttach={handleAttach} colors={colors} />
+      <TitleBar isAttached={isAttached} onAttach={handleAttach} colors={colors} settings={settings} />
 
       <div className="flex flex-1 overflow-hidden relative">
-        
-        {/* ACTIVITY BAR */}
         <div className="w-12 flex flex-col items-center py-4 gap-4 z-20 border-r border-white/5" style={{ backgroundColor: colors.bg }}>
            <ActivityIcon icon={Files} id="files" active={activeActivity} onClick={setActiveActivity} colors={colors} />
            <ActivityIcon icon={Cloud} id="scripts" active={activeActivity} onClick={setActiveActivity} colors={colors} />
@@ -152,17 +169,18 @@ export default function App() {
 
         {activeActivity === 'files' ? (
             <>
-                {/* SIDEBAR */}
                 <div className="w-56 flex flex-col border-r border-white/5" style={{ backgroundColor: colors.sidebar }}>
                     <div className="h-9 px-4 flex items-center text-[11px] font-bold tracking-widest opacity-60 uppercase">Explorer</div>
                     <div className="flex-1 overflow-y-auto px-2 pt-2">
                         <FolderItem name="LUMINOS-PROJECT" isOpen={true} isRoot colors={colors}>
                             <FolderItem name="src" isOpen={expandedFolders['src']} onClick={() => toggleFolder('src')} indent={1} colors={colors}>
-                                <FolderItem name="scripts" isOpen={expandedFolders['scripts']} onClick={() => toggleFolder('scripts')} indent={2} colors={colors}>
-                                    {files.filter(f => f.folder === 'scripts' && !f.isTemp).map(file => (
-                                        <FileItem key={file.id} file={file} indent={3} active={activeTabId === file.id} isRenaming={renamingId === file.id} onClick={() => { if(!openTabIds.includes(file.id)) setOpenTabIds([...openTabIds, file.id]); setActiveTabId(file.id) }} setRenamingId={setRenamingId} onRename={handleRename} colors={colors} />
-                                    ))}
-                                </FolderItem>
+                                {uniqueFolders.map(folderName => (
+                                    <FolderItem key={folderName} name={folderName} isOpen={expandedFolders[folderName]} onClick={() => toggleFolder(folderName)} indent={2} colors={colors}>
+                                        {files.filter(f => f.folder === folderName && !f.isTemp).map(file => (
+                                            <FileItem key={file.id} file={file} indent={3} active={activeTabId === file.id} isRenaming={renamingId === file.id} onClick={() => { if(!openTabIds.includes(file.id)) setOpenTabIds([...openTabIds, file.id]); setActiveTabId(file.id) }} setRenamingId={setRenamingId} onRename={handleRename} colors={colors} />
+                                        ))}
+                                    </FolderItem>
+                                ))}
                             </FolderItem>
                             {files.filter(f => f.folder === 'root' && !f.isTemp).map(file => (
                                 <FileItem key={file.id} file={file} indent={1} active={activeTabId === file.id} isRenaming={renamingId === file.id} onClick={() => { if(!openTabIds.includes(file.id)) setOpenTabIds([...openTabIds, file.id]); setActiveTabId(file.id) }} setRenamingId={setRenamingId} onRename={handleRename} colors={colors} />
@@ -171,7 +189,6 @@ export default function App() {
                     </div>
                 </div>
 
-                {/* EDITOR */}
                 <div className="flex-1 flex flex-col relative min-w-0" style={{ backgroundColor: colors.bg }}>
                     <div className="flex h-9 border-b border-white/5 overflow-x-auto scrollbar-hide items-center pr-2" style={{ backgroundColor: colors.bg }}>
                         {openTabIds.map(id => {
@@ -186,7 +203,7 @@ export default function App() {
                         {activeFile ? (
                             <AceEditor
                                 mode={getMode(activeFile.name)}
-                                theme={settings.theme === 'acrylic' ? 'dracula' : settings.theme}
+                                theme={settings.theme === 'custom' ? 'dracula' : settings.theme} // Fallback for Ace
                                 name="luminos_editor"
                                 onChange={handleEditorChange}
                                 fontSize={parseInt(settings.fontSize)}
@@ -248,8 +265,8 @@ export default function App() {
         )}
       </div>
 
-      {isSettingsOpen && <SettingsModal onClose={() => setIsSettingsOpen(false)} settings={settings} onUpdate={updateSetting} colors={colors} />}
-      {saveModal.open && <SaveFileModal onClose={() => setSaveModal({ open: false, fileId: null })} onConfirm={confirmSave} currentName={files.find(f => f.id === saveModal.fileId)?.name} colors={colors} />}
+      {isSettingsOpen && <SettingsModal onClose={() => setIsSettingsOpen(false)} settings={settings} onUpdate={updateSetting} colors={colors} customTheme={customTheme} setCustomTheme={setCustomTheme} />}
+      {saveModal.open && <SaveFileModal onClose={() => setSaveModal({ open: false, fileId: null })} onConfirm={confirmSave} currentName={files.find(f => f.id === saveModal.fileId)?.name} colors={colors} existingFolders={uniqueFolders} />}
       
       <div className="h-7 backdrop-blur-md border-t border-white/5 flex items-center px-3 text-[11px] justify-between select-none z-40" style={{ backgroundColor: `${colors.bg}dd`, color: colors.text }}>
          <div className="flex gap-4"><span className={`flex items-center gap-2`}><div className={`w-2 h-2 rounded-full ${isAttached ? 'animate-pulse' : ''}`} style={{ backgroundColor: isAttached ? colors.accent : '#ef4444' }} />{isAttached ? 'Attached' : 'Unattached'}</span></div>
@@ -259,12 +276,21 @@ export default function App() {
   )
 }
 
-// --- HELPER COMPONENTS ---
-function SaveFileModal({ onClose, onConfirm, currentName, colors }) { const [name, setName] = useState(currentName); const [folder, setFolder] = useState('scripts'); return <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm" onClick={onClose}><div className="w-[400px] p-6 border border-white/10 rounded-xl shadow-2xl flex flex-col gap-4 backdrop-blur-xl" style={{ backgroundColor: `${colors.bg}ee` }} onClick={(e) => e.stopPropagation()}><h2 className="text-lg font-bold" style={{ color: colors.text }}>Save File</h2><div><label className="text-xs font-medium opacity-70 block mb-1" style={{ color: colors.text }}>Filename</label><input autoFocus value={name} onChange={(e) => setName(e.target.value)} className="w-full px-3 py-2 rounded-lg border border-white/10 text-sm focus:outline-none focus:border-opacity-50" style={{ backgroundColor: `${colors.sidebar}80`, color: colors.text, borderColor: colors.accent }} /></div><div><label className="text-xs font-medium opacity-70 block mb-1" style={{ color: colors.text }}>Folder</label><div className="grid grid-cols-2 gap-2"><div onClick={() => setFolder('scripts')} className={`px-3 py-2 rounded-lg border cursor-pointer flex items-center gap-2 text-sm transition-all ${folder === 'scripts' ? 'opacity-100' : 'opacity-50'}`} style={{ backgroundColor: folder === 'scripts' ? `${colors.accent}20` : 'transparent', borderColor: folder === 'scripts' ? colors.accent : 'transparent', color: colors.text }}><Folder size={14} /> Scripts</div><div onClick={() => setFolder('root')} className={`px-3 py-2 rounded-lg border cursor-pointer flex items-center gap-2 text-sm transition-all ${folder === 'root' ? 'opacity-100' : 'opacity-50'}`} style={{ backgroundColor: folder === 'root' ? `${colors.accent}20` : 'transparent', borderColor: folder === 'root' ? colors.accent : 'transparent', color: colors.text }}><Files size={14} /> Root</div></div></div><button onClick={() => onConfirm(name, folder)} className="w-full py-2.5 rounded-lg font-bold text-sm transition-all hover:opacity-90 mt-2" style={{ backgroundColor: colors.button, color: '#fff' }}>Save File</button></div></div> }
+// --- SETTINGS MODAL WITH BUILDER ---
+function SettingsModal({ onClose, settings, onUpdate, colors, customTheme, setCustomTheme }) { 
+    const [activeTab, setActiveTab] = useState('general'); 
+    const handleColorChange = (key, val) => { const newTheme = { ...customTheme, [key]: val }; setCustomTheme(newTheme); onUpdate('theme', 'custom') }
+    const modalBg = colors.bg; 
+    return <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm" onClick={onClose}><div className="w-[700px] h-[500px] border border-white/10 rounded-xl shadow-2xl flex overflow-hidden flex-col md:flex-row backdrop-blur-md" style={{ backgroundColor: modalBg }} onClick={(e) => e.stopPropagation()}><div className="w-48 border-r border-white/5 p-3 flex flex-col gap-1" style={{ backgroundColor: colors.sidebar }}><div className="text-xs font-bold uppercase tracking-widest mb-3 px-3 mt-2" style={{ color: colors.text, opacity: 0.5 }}>Settings</div><SettingsTab label="General" id="general" active={activeTab} onClick={setActiveTab} colors={colors} /><SettingsTab label="Editor" id="editor" active={activeTab} onClick={setActiveTab} colors={colors} /><SettingsTab label="Themes" id="themes" active={activeTab} onClick={setActiveTab} colors={colors} /><SettingsTab label="Builder" id="builder" active={activeTab} onClick={setActiveTab} colors={colors} /></div><div className="flex-1 flex flex-col"><div className="h-14 border-b border-white/5 flex items-center justify-between px-6"><h2 className="text-lg font-medium capitalize" style={{ color: colors.text }}>{activeTab}</h2><button onClick={onClose} className="p-2 hover:bg-white/10 rounded-lg transition-colors" style={{ color: colors.text }}><X size={18} /></button></div><div className="flex-1 overflow-y-auto p-6 space-y-6">{activeTab === 'general' && (<><SettingToggle label="Auto Save" desc="Automatically save files after a delay." checked={settings.autoSave} onChange={(val) => onUpdate('autoSave', val)} colors={colors} /><SettingToggle label="Always On Top" desc="Keep window above others." checked={settings.topMost} onChange={(val) => onUpdate('topMost', val)} colors={colors} /><div className="opacity-50 cursor-not-allowed pointer-events-none"><SettingToggle label="Acrylic Blur" desc="Coming soon." checked={false} onChange={() => {}} colors={colors} /></div></>)} {activeTab === 'editor' && (<><SettingInput label="Font Size" value={settings.fontSize} onChange={(e) => onUpdate('fontSize', e.target.value)} colors={colors} /><SettingToggle label="Line Numbers" desc="Show gutter numbers." checked={settings.showLineNumbers} onChange={(val) => onUpdate('showLineNumbers', val)} colors={colors} /></>)} {activeTab === 'themes' && (<div className="grid grid-cols-2 gap-3">{Object.entries(PRESET_THEMES).map(([key, t]) => (<div key={key} onClick={() => onUpdate('theme', key)} className={`p-3 rounded-xl border cursor-pointer flex items-center justify-between transition-all`} style={{ backgroundColor: settings.theme === key ? `${colors.accent}20` : 'rgba(255,255,255,0.05)', borderColor: settings.theme === key ? colors.accent : 'transparent' }}><div className="flex items-center gap-3"><div className="w-6 h-6 rounded-full border border-white/10" style={{ backgroundColor: t.bg }}></div><span className="text-sm font-medium" style={{ color: colors.text }}>{t.name}</span></div>{settings.theme === key && <Check size={16} style={{ color: colors.accent }} />}</div>))}</div>)} {activeTab === 'builder' && (<div className="space-y-4"><div className="p-4 rounded-xl border border-white/10 bg-white/5 mb-4"><p className="text-xs opacity-70" style={{ color: colors.text }}>Edit colors below to automatically switch to "Custom" theme.</p></div><ColorPicker label="Background" value={customTheme.bg} onChange={(v) => handleColorChange('bg', v)} colors={colors} /><ColorPicker label="Sidebar" value={customTheme.sidebar} onChange={(v) => handleColorChange('sidebar', v)} colors={colors} /><ColorPicker label="Accent" value={customTheme.accent} onChange={(v) => handleColorChange('accent', v)} colors={colors} /><ColorPicker label="Buttons" value={customTheme.button} onChange={(v) => handleColorChange('button', v)} colors={colors} /><ColorPicker label="Text" value={customTheme.text} onChange={(v) => handleColorChange('text', v)} colors={colors} /></div>)}</div></div></div></div> 
+}
+
+function ColorPicker({ label, value, onChange, colors }) { return <div className="flex items-center justify-between"><span className="text-sm font-medium" style={{ color: colors.text }}>{label}</span><div className="flex items-center gap-2"><span className="text-xs opacity-50 font-mono">{value}</span><input type="color" value={value} onChange={(e) => onChange(e.target.value)} className="w-8 h-8 rounded cursor-pointer border-0 bg-transparent" /></div></div> }
+
+// ... HELPER COMPONENTS (Unchanged) ...
+function SaveFileModal({ onClose, onConfirm, currentName, colors, existingFolders }) { const [name, setName] = useState(currentName); const [folder, setFolder] = useState('scripts'); const [isCreatingFolder, setIsCreatingFolder] = useState(false); const [newFolderName, setNewFolderName] = useState(''); const handleConfirm = () => { const targetFolder = isCreatingFolder ? newFolderName.trim() : folder; if (!targetFolder) return; onConfirm(name, targetFolder) }; return <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm" onClick={onClose}><div className="w-[400px] p-6 border border-white/10 rounded-xl shadow-2xl flex flex-col gap-4 backdrop-blur-xl" style={{ backgroundColor: `${colors.bg}ee` }} onClick={(e) => e.stopPropagation()}><h2 className="text-lg font-bold" style={{ color: colors.text }}>Save File</h2><div><label className="text-xs font-medium opacity-70 block mb-1" style={{ color: colors.text }}>Filename</label><input autoFocus value={name} onChange={(e) => setName(e.target.value)} className="w-full px-3 py-2 rounded-lg border border-white/10 text-sm focus:outline-none focus:border-opacity-50" style={{ backgroundColor: `${colors.sidebar}80`, color: colors.text, borderColor: colors.accent }} /></div><div><div className="flex items-center justify-between mb-1"><label className="text-xs font-medium opacity-70" style={{ color: colors.text }}>Folder</label><button onClick={() => setIsCreatingFolder(!isCreatingFolder)} className="text-[10px] underline opacity-70 hover:opacity-100" style={{ color: colors.accent }}>{isCreatingFolder ? 'Select Existing' : '+ New Folder'}</button></div>{isCreatingFolder ? (<input placeholder="Enter folder name..." autoFocus value={newFolderName} onChange={(e) => setNewFolderName(e.target.value)} className="w-full px-3 py-2 rounded-lg border border-white/10 text-sm focus:outline-none focus:border-opacity-50" style={{ backgroundColor: `${colors.sidebar}80`, color: colors.text, borderColor: colors.accent }} />) : (<div className="grid grid-cols-2 gap-2 max-h-32 overflow-y-auto custom-scrollbar">{existingFolders.map(f => (<div key={f} onClick={() => setFolder(f)} className={`px-3 py-2 rounded-lg border cursor-pointer flex items-center gap-2 text-sm transition-all truncate`} style={{ backgroundColor: folder === f ? `${colors.accent}20` : 'transparent', borderColor: folder === f ? colors.accent : 'transparent', color: colors.text }}><Folder size={14} /> {f}</div>))}<div onClick={() => setFolder('root')} className={`px-3 py-2 rounded-lg border cursor-pointer flex items-center gap-2 text-sm transition-all`} style={{ backgroundColor: folder === 'root' ? `${colors.accent}20` : 'transparent', borderColor: folder === 'root' ? colors.accent : 'transparent', color: colors.text }}><Files size={14} /> Root</div></div>)}</div><button onClick={handleConfirm} className="w-full py-2.5 rounded-lg font-bold text-sm transition-all hover:opacity-90 mt-2" style={{ backgroundColor: colors.button, color: '#fff' }}>Save File</button></div></div> }
 function TooltipButton({ icon, onClick, title, hoverColor, colors }) { return <button onClick={onClick} title={title} className={`p-2 rounded-full transition-all duration-200 hover:bg-white/10 hover:scale-110 ${hoverColor || ''}`} style={{ color: colors.text }}>{icon}</button> }
-function TitleBar({ isAttached, onAttach, colors }) { return <div className="h-8 flex items-center justify-between select-none border-b border-white/5 pl-2" style={{ backgroundColor: colors.bg, WebkitAppRegion: 'drag' }}><div className="flex items-center gap-3"><button onClick={onAttach} className={`p-1 rounded hover:bg-white/10 transition-colors`} style={{ color: isAttached ? colors.accent : '#ef4444', WebkitAppRegion: 'no-drag' }} title={isAttached ? "Attached to process" : "Click to Attach"}>{isAttached ? <Link size={14} /> : <Unlink size={14} />}</button><div className="text-[11px] font-medium tracking-wide" style={{ color: colors.text }}>Luminos</div></div><div className="flex h-full" style={{ WebkitAppRegion: 'no-drag' }}><WindowButton icon={<Minus size={14} />} onClick={() => window.api.minimize()} colors={colors} /><WindowButton icon={<Square size={10} />} onClick={() => window.api.maximize()} colors={colors} /><WindowButton icon={<X size={14} />} onClick={() => window.api.close()} isClose colors={colors} /></div></div> }
+function TitleBar({ isAttached, onAttach, colors, settings }) { const bgColor = settings.theme === 'acrylic' ? 'transparent' : colors.bg; return <div className="h-8 flex items-center justify-between select-none border-b border-white/5 pl-2" style={{ backgroundColor: bgColor, WebkitAppRegion: 'drag' }}><div className="flex items-center gap-3"><button onClick={onAttach} className={`p-1 rounded hover:bg-white/10 transition-colors`} style={{ color: isAttached ? colors.accent : '#ef4444', WebkitAppRegion: 'no-drag' }} title={isAttached ? "Attached to process" : "Click to Attach"}>{isAttached ? <Link size={14} /> : <Unlink size={14} />}</button><div className="text-[11px] font-medium tracking-wide" style={{ color: colors.text }}>Luminos - Editor</div></div><div className="flex h-full" style={{ WebkitAppRegion: 'no-drag' }}><WindowButton icon={<Minus size={14} />} onClick={() => window.api.minimize()} colors={colors} /><WindowButton icon={<Square size={10} />} onClick={() => window.api.maximize()} colors={colors} /><WindowButton icon={<X size={14} />} onClick={() => window.api.close()} isClose colors={colors} /></div></div> }
 function DraggableTerminal({ onClose, logs, colors, settings }) { const [position, setPosition] = useState({ x: 20, y: -220 }); const [isDragging, setIsDragging] = useState(false); const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 }); const [isMaximized, setIsMaximized] = useState(false); const terminalRef = useRef(null); const logsEndRef = useRef(null); useEffect(() => { logsEndRef.current?.scrollIntoView({ behavior: "smooth" }) }, [logs]); const handleMouseDown = (e) => { if (isMaximized) return; setIsDragging(true); const rect = terminalRef.current.getBoundingClientRect(); setDragOffset({ x: e.clientX - rect.left, y: e.clientY - rect.top }) }; useEffect(() => { const handleMouseMove = (e) => { if (isDragging) { setPosition({ x: e.clientX - dragOffset.x, y: e.clientY - dragOffset.y }) } }; const handleMouseUp = () => setIsDragging(false); if (isDragging) { document.addEventListener('mousemove', handleMouseMove); document.addEventListener('mouseup', handleMouseUp) } return () => { document.removeEventListener('mousemove', handleMouseMove); document.removeEventListener('mouseup', handleMouseUp) } }, [isDragging, dragOffset]); const style = isMaximized ? { inset: 0, width: '100%', height: '100%', borderRadius: 0 } : { left: position.x, bottom: 60, width: 500, height: 200 }; const bgColor = `${colors.bg}ee`; return <div ref={terminalRef} style={{...style, backgroundColor: bgColor}} className="absolute backdrop-blur-xl border border-white/10 shadow-2xl flex flex-col overflow-hidden z-50 rounded-lg"><div className="h-8 flex items-center justify-between px-3 border-b border-white/5 select-none cursor-move" style={{ backgroundColor: `${colors.sidebar}50` }} onMouseDown={handleMouseDown}><span className="text-[11px] font-semibold uppercase tracking-wider" style={{ color: colors.text }}>Terminal</span><div className="flex gap-2 opacity-50"><button onClick={() => setIsMaximized(!isMaximized)}><Square size={10} /></button><button onClick={onClose}><X size={14} /></button></div></div><div className="flex-1 p-3 font-mono text-xs overflow-y-auto" style={{ color: colors.text }}>{logs.map((log, i) => (<div key={i} className="mb-1 flex gap-2"><span className="opacity-30">[{log.time}]</span><span style={{ color: log.type === 'error' ? '#ef4444' : log.type === 'success' ? colors.accent : colors.text }}>{log.text}</span></div>))}<div ref={logsEndRef} /></div></div> }
-function SettingsModal({ onClose, settings, onUpdate, colors }) { const [activeTab, setActiveTab] = useState('general'); const modalBg = colors.bg; return <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm" onClick={onClose}><div className="w-[700px] h-[500px] border border-white/10 rounded-xl shadow-2xl flex overflow-hidden flex-col md:flex-row backdrop-blur-md" style={{ backgroundColor: modalBg }} onClick={(e) => e.stopPropagation()}><div className="w-48 border-r border-white/5 p-3 flex flex-col gap-1" style={{ backgroundColor: colors.sidebar }}><div className="text-xs font-bold uppercase tracking-widest mb-3 px-3 mt-2" style={{ color: colors.text, opacity: 0.5 }}>Settings</div><SettingsTab label="General" id="general" active={activeTab} onClick={setActiveTab} colors={colors} /><SettingsTab label="Editor" id="editor" active={activeTab} onClick={setActiveTab} colors={colors} /><SettingsTab label="Themes" id="themes" active={activeTab} onClick={setActiveTab} colors={colors} /></div><div className="flex-1 flex flex-col"><div className="h-14 border-b border-white/5 flex items-center justify-between px-6"><h2 className="text-lg font-medium capitalize" style={{ color: colors.text }}>{activeTab}</h2><button onClick={onClose} className="p-2 hover:bg-white/10 rounded-lg transition-colors" style={{ color: colors.text }}><X size={18} /></button></div><div className="flex-1 overflow-y-auto p-6 space-y-6">{activeTab === 'general' && (<><SettingToggle label="Auto Save" desc="Automatically save files after a delay." checked={settings.autoSave} onChange={(val) => onUpdate('autoSave', val)} colors={colors} /><SettingToggle label="Acrylic Blur" desc="Enable background transparency for other themes." checked={settings.acrylicBlur} onChange={(val) => onUpdate('acrylicBlur', val)} colors={colors} /></>)} {activeTab === 'editor' && (<><SettingInput label="Font Size" value={settings.fontSize} onChange={(e) => onUpdate('fontSize', e.target.value)} colors={colors} /><SettingToggle label="Line Numbers" desc="Show gutter numbers." checked={settings.showLineNumbers} onChange={(val) => onUpdate('showLineNumbers', val)} colors={colors} /></>)} {activeTab === 'themes' && (<div className="grid grid-cols-2 gap-3">{Object.entries(THEMES).map(([key, t]) => (<div key={key} onClick={() => onUpdate('theme', key)} className={`p-3 rounded-xl border cursor-pointer flex items-center justify-between transition-all`} style={{ backgroundColor: settings.theme === key ? `${colors.accent}20` : 'rgba(255,255,255,0.05)', borderColor: settings.theme === key ? colors.accent : 'transparent' }}><div className="flex items-center gap-3"><div className="w-6 h-6 rounded-full border border-white/10" style={{ backgroundColor: t.bg }}></div><span className="text-sm font-medium" style={{ color: colors.text }}>{t.name}</span></div>{settings.theme === key && <Check size={16} style={{ color: colors.accent }} />}</div>))}</div>)}</div></div></div></div> }
 function WindowButton({ icon, onClick, isClose, colors }) { return <button onClick={onClick} className={`w-10 h-full flex items-center justify-center transition-colors hover:bg-white/10`} style={{ color: colors.text }}>{icon}</button> }
 function ActivityIcon({ icon: Icon, id, active, onClick, colors }) { return <div onClick={() => onClick(id)} className={`p-2 rounded-lg cursor-pointer transition-all duration-200`} style={{ color: active === id ? '#fff' : colors.text, backgroundColor: active === id ? colors.button : 'transparent', opacity: active === id ? 1 : 0.6 }}><Icon size={20} strokeWidth={1.5} /></div> }
 function FolderItem({ name, isOpen, children, onClick, indent = 0, isRoot, colors }) { return <div><div onClick={onClick} className={`flex items-center gap-2 py-1 cursor-pointer hover:bg-white/5 select-none transition-colors`} style={{ paddingLeft: indent * 12 + 8, color: colors.text }}><ChevronRight size={14} className={`transition-transform duration-200 ${isOpen ? 'rotate-90' : ''}`} /><span className={`text-[13px] ${isRoot ? 'font-bold' : ''}`}>{name}</span></div>{isOpen && children}</div> }
