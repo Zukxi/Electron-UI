@@ -86,11 +86,11 @@ To build and run this project locally:
 
 1.  Clone the repository:
     ```bash
-    git clone [https://github.com/zukxi/Electron-UI.git](https://github.com/zukxi/Electron-UI.git)
+    git clone https://github.com/zukxi/Electron-UI.git
     ```
 2.  Navigate to the folder:
     ```bash
-    cd luminos-executor
+    cd zuki
     ```
 3.  Install dependencies:
     ```bash
