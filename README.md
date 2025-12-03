@@ -28,7 +28,7 @@ Powered by **Ace Editor**, the industry-standard web code editor.
 * **Features:** Lua syntax highlighting, autocomplete, line numbers, and gutter support.
 * **Functionality:** Supports opening `.lua` and `.txt` files from your PC and saving them to the sidebar workspace.
 
-![Luminos Editor Screenshot](https://i.e-z.host/8suv2eff.png)
+![Luminos Editor Screenshot]([https://i.e-z.host/8suv2eff.png](https://v3rm.net/attachments/1764282054091-png.31115/))
 
 
 ### 2. The Script Hub
